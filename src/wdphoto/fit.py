@@ -37,8 +37,6 @@ def mag_to_flux_spec_AB(mag, filt, e_mag = None):
         return 10**(-0.4*(mag + filt.AB_zero_mag))
     
 def template(teff, logg, radius, distance):
-    #get warwick model flux spectrum for a WD with a given radius, located a given distance away
-    
     fl= 4*np.pi*warwick_model((teff,logg))#flux in physical units
     
     #convert to SI units
@@ -46,28 +44,41 @@ def template(teff, logg, radius, distance):
     distance = distance * pc_to_m # Parsec to meter
     
     fl = (radius / distance)**2 * fl
+    
     return fl
     
 
-def get_model_flux(params, filters):
+def get_model_flux(params, filters, cache = None, key = None):
     #get model photometric flux for a WD with a given radius, located a given distance away
     teff, logg, radius, distance = params['teff'], params['logg'], params['radius'], params['distance']
+        
+    if cache is None:
+        fl= 4*np.pi*warwick_model((teff,logg))#flux in physical units
+        fl = np.array([filt.get_flux(base_wavl * pyphot.unit['angstrom'], fl * pyphot.unit['erg/s/cm**2/angstrom'], axis = 1).to('erg/s/cm**2/angstrom').value for filt in filters])
+    else:            
+        indx = [key[filt.name] for filt in filters]
+        fl = 4 * np.pi * cache((teff, logg))[indx]
+        
     
-    fl = template(teff, logg, radius, distance) 
+    #convert to SI units
+    radius = radius * radius_sun # Rsun to meter
+    distance = distance * pc_to_m # Parsec to meter
+    
+    fl = (radius / distance)**2 * fl
             
-    flux = np.array([filt.get_flux(base_wavl * pyphot.unit['angstrom'], fl * pyphot.unit['erg/s/cm**2/angstrom'], axis = 1).to('erg/s/cm**2/angstrom').value for filt in filters])
-    return flux
+    
+    return fl
     
 
-def residual(params, obs_flux = None, e_obs_flux = None, filters = None):
+def residual(params, obs_flux = None, e_obs_flux = None, filters = None, cache = None, key = None):
     #calculate the chi2 between the model and the fit
-    model_flux = get_model_flux(params, filters)
+    model_flux = get_model_flux(params, filters, cache, key)
     
     chisquare = ((model_flux - obs_flux) / e_obs_flux)**2
 
     return chisquare
 
-def get_parameters(obs_flux, e_obs_flux, filters, p0 = [10000, 8, 0.003, 100]):          
+def get_parameters(obs_flux, e_obs_flux, filters, cache, key, p0 = [10000, 8, 0.003, 100]):          
     #use lmfit.minimize to fit the model to the data
     params = lmfit.Parameters()
     params.add('teff', value = p0[0], min = 3001, max = 100000, vary = True)
@@ -75,11 +86,23 @@ def get_parameters(obs_flux, e_obs_flux, filters, p0 = [10000, 8, 0.003, 100]):
     params.add('radius', value = p0[2], min = 0.000001, max = 0.1, vary = True)
     params.add('distance', value = p0[3], min = 1, max = 2000, vary = False)
             
-    result = lmfit.minimize(residual, params, kws = dict(obs_flux = obs_flux, e_obs_flux = e_obs_flux, filters = filters), method = 'leastsq')
+    result = lmfit.minimize(residual, params, kws = dict(obs_flux = obs_flux, e_obs_flux = e_obs_flux, filters = filters, cache = cache, key = key), method = 'leastsq')
         
     return result
 
-def fit_parameters(catalog, source_id_key, coord_keys, photo_keys, e_photo_keys, photo_bands, distance_set = 'med', verbose_output = False, plot = False):
+def fit_parameters(catalog, source_id_key, coord_keys, photo_keys, e_photo_keys, photo_bands, distance_set = 'med',
+                  cachefile = None, verbose_output = False, plot = False):
+    if cachefile is not None:
+        try:
+            cache, key = models.read_cache(cachefile)
+        except:
+            print('Fatal Error: Cache table not found {} \nProceeding using Warwick models'.format(cachefile))
+            cache = None
+            key = None
+    else:
+        cache = None
+        key = None
+    
     lib = pyphot.get_library()
     filters = [lib[photo_bands[i]] for i in range(len(photo_bands))]
     
@@ -106,13 +129,15 @@ def fit_parameters(catalog, source_id_key, coord_keys, photo_keys, e_photo_keys,
         e_obs_flux = [mag_to_flux_spec_Vega(mags[j], filters[j], e_mags[j])[1] for j in range(len(mags))]
         
         try:
-            result_8 = get_parameters(obs_flux, e_obs_flux, filters, p0 = [10000, 8, 0.003, photo[distance_col][i]])
-            result_7 = get_parameters(obs_flux, e_obs_flux, filters, p0 = [10000, 8, 0.003, photo[distance_col][i]])
-            result_9 = get_parameters(obs_flux, e_obs_flux, filters, p0 = [10000, 8, 0.003, photo[distance_col][i]])
+            result_8 = get_parameters(obs_flux, e_obs_flux, filters, cache, key, p0 = [10000, 8, 0.003, photo[distance_col][i]])
+            result_7 = get_parameters(obs_flux, e_obs_flux, filters, cache, key, p0 = [10000, 8, 0.003, photo[distance_col][i]])
+            result_9 = get_parameters(obs_flux, e_obs_flux, filters, cache, key, p0 = [10000, 8, 0.003, photo[distance_col][i]])
         except:
+            print('Failed to fit source Gaia DR3 {}, appending -9999!'.format(photo[source_id_key][i]))
+            
             teff.append(-9999)
             e_teff.append(-9999)
-            radius.append(-9999)
+            radius.append(-9999)            
             e_radius.append(-9999)
             chi2.append(-9999)
             
@@ -125,7 +150,11 @@ def fit_parameters(catalog, source_id_key, coord_keys, photo_keys, e_photo_keys,
                 fig, ax1 =plt.subplots(1,1,figsize=(7,7))
                 ax1.errorbar([filters[j].lpivot.to('angstrom').value for j in range(len(filters))], obs_flux, yerr = e_obs_flux, 
                              linestyle = 'none', marker = 'None', color = 'k', capsize = 5, label = 'Observed SED', zorder = 10)
-                ax1.plot([filters[j].lpivot.to('angstrom').value for j in range(len(filters))], get_model_flux(result_8.params, filters), 'co', markersize = 10, label = 'Model SED')
+                
+                if cache is None:
+                    ax1.plot([filters[j].lpivot.to('angstrom').value for j in range(len(filters))], get_model_flux(result_8.params, filters), 'co', markersize = 10, label = 'Model SED')
+                else:
+                    ax1.plot([filters[j].lpivot.to('angstrom').value for j in range(len(filters))], get_model_flux(result_8.params, filters, cache, key), 'co', markersize = 10, label = 'Model SED')
                 
                 model_fl = template(result_8.params['teff'].value, result_8.params['logg'].value, result_8.params['radius'].value, result_8.params['distance'].value)
                 mask = (3600 < base_wavl)*(base_wavl<9000)
@@ -146,30 +175,12 @@ def fit_parameters(catalog, source_id_key, coord_keys, photo_keys, e_photo_keys,
                 figs.append(fig)
                 plt.close()
         
-        try:
-            teff.append(result_8.params['teff'].value)
-        except:
-            teff.append(-9999)
-        
-        try:
-            e_teff.append(result_8.params['teff'].stderr)
-        except:
-            e_teff.append(-9999)
-            
-        try:
-            radius.append(result_8.params['radius'].value)
-        except:
-            radius.append(-9999)
-            
-        try:
-            e_radius.append(np.sqrt(result_8.params['radius'].stderr**2 + np.abs(result_7.params['radius'].value - result_9.params['radius'].value)**2 ))
-        except:
-            e_radius.append(-9999)
-        
-        try:
-            chi2.append(result_8.redchi)
-        except:
-            chi2.append(-9999)
+        teff.append(result_8.params['teff'].value)
+        e_teff.append(result_8.params['teff'].stderr)
+        radius.append(result_8.params['radius'].value)            
+        e_radius.append(np.sqrt(result_8.params['radius'].stderr**2 + np.abs(result_7.params['radius'].value - result_9.params['radius'].value)**2 ))
+        chi2.append(result_8.redchi)
+
     
     photo['radius'] = radius
     photo['e_radius'] = e_radius

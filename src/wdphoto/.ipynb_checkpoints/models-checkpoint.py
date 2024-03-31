@@ -16,7 +16,7 @@ def air2vac(wv):
     return (np.array(wv)*(1.+6.4328e-5+2.94981e-2/\
                           (146.-_tl**2)+2.5540e-4/(41.-_tl**2)))
 
-def build_warwick_da(path = '/models/warwick_da', outpath = None, flux_unit = 'flam'):
+def build_warwick_da(path = '/data/warwick_da', outpath = None, flux_unit = 'flam'):
     dirpath = os.path.dirname(os.path.realpath(__file__))
     files = glob.glob(dirpath + path + '/*')
     
@@ -136,3 +136,30 @@ def build_warwick_da(path = '/models/warwick_da', outpath = None, flux_unit = 'f
         np.save(outpath + '/warwick_da_wavl', base_wavl)
         
     return wavls[0], model_spec, model_spec_low_logg, table
+
+def read_cache(table):
+    cache = Table.read(table)
+    
+    teff = np.unique(np.array(cache['teff']))
+    logg = np.unique(np.array(cache['logg']))
+    
+    key_dict = {}
+    raw_data = np.zeros((len(teff), len(logg), 271))
+    
+    #test.remove_columns(['teff', 'logg'])
+    for i in range(len(teff)):
+        for j in range(len(logg)):
+            teff_loc = np.where(cache['teff'] == teff[i])[0]
+            logg_loc = np.where(cache['logg'] == logg[j])[0]
+    
+            k = np.intersect1d(teff_loc, logg_loc)[0]
+            raw_data[i,j] = [cache[key][k] for key in cache.keys()[2:]]
+            
+    for ii, key in enumerate(cache.keys()[2:]):
+        key_dict[key] = ii
+            
+    model_sed = RegularGridInterpolator((teff, logg), raw_data)
+    
+    return model_sed, key_dict
+    
+    
