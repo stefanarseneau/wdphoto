@@ -33,48 +33,13 @@ class WarwickDAInterpolator:
                 self.key[band.name] = i
         else:
             dirpath = os.path.dirname(os.path.realpath(__file__)) # identify the current directory
-            #interp, self.key = self.read_cache(f'{dirpath}/data/warwick_da/warwick_cache_table.csv')
             table = Table.read(f'{dirpath}/data/warwick_da/warwick_cache_table.csv') 
             self.interp = MultiBandInterpolator(table, self.bands)
             self.key = {band:i for i, band in enumerate(self.bands)}
-            #self.interp = lambda teff, logg: interp((teff, logg))
 
         self.teff_lims = (3001, 90000)
         self.logg_lims = (4.51, 9.49)
 
-    def read_cache(self, table):
-        """
-        Args:
-            table (filepath): a table that contains keys `teff`, `logg`, and photometry with names equivalent to those from pyphot
-        Returns:
-            table_interp (RegularGridInterpolator): interpolates teff and logg to a vector containing photometry
-            key_dict (dict): sends pyphot photometry keys to the index of the vector output of table_interp
-        """
-        cache = Table.read(table) # read the table
-
-        teff = np.unique(np.array(cache['teff'])) # create a list of unique teffs
-        logg = np.unique(np.array(cache['logg'])) # create a list of unique loggs
-        
-        key_dict = {} # instantiate empty key dictionary
-        raw_data = np.zeros((len(teff), len(logg), len(self.bands)))
-        
-        # iterate over all unique teffs and loggs
-        for i in range(len(teff)):
-            for j in range(len(logg)):
-                # find the location in the cache table that has that unique logg and teff
-                teff_loc = np.where(cache['teff'] == teff[i])[0]
-                logg_loc = np.where(cache['logg'] == logg[j])[0]
-                k = np.intersect1d(teff_loc, logg_loc)[0]
-
-                # read the photometries into the raw_data
-                raw_data[i,j] = [cache[key][k] for key in self.bands]
-                
-        # now, create the cache table
-        for ii, key in enumerate(self.bands):
-            key_dict[key] = ii # save the index of that key
-                
-        table_interp = RegularGridInterpolator((teff, logg), raw_data) # create the interpolator object
-        return table_interp, key_dict
 
 class LaPlataInterpolator:
     def __init__(self, core, layer, z, bands):
@@ -86,7 +51,7 @@ class LaPlataInterpolator:
         self.bands = bands
 
         self.table = self.build_table_over_mass()
-        
+
         self.interp = MultiBandInterpolator(self.table, self.bands)
         self.key = {band:i for i, band in enumerate(self.bands)}
         self.teff_lims = (4000, 73000)
