@@ -1,0 +1,22 @@
+Metadata-Version: 2.1
+Name: wdphoto
+Version: 0.0.2
+Summary: Tools for fitting white dwarf SEDs
+Author-email: Stefan Arseneau <arseneausm@gmail.com>
+Project-URL: Homepage, https://github.com/stefanarseneau/wdphoto
+Project-URL: Issues, https://github.com/stefanarseneau/wdphoto/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+## wdphoto : Photometric Fitting for White Dwarfs
+---
+
+If you use this, don't forget to cite [the model spectra that make it possible!](https://warwick.ac.uk/fac/sci/physics/research/astro/people/tremblay/modelgrids/readme_3d.txt)
+
+Contributors:
+- Stefan Arseneau
+- Nicole Crumpler
