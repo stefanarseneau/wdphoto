@@ -8,7 +8,7 @@ from astropy.table import Table, vstack
 import pyphot
 
 if __name__ != "__main__":
-    from . import models
+    from . import utils
 
 lib = pyphot.get_library()
 
@@ -25,7 +25,7 @@ class WarwickDAInterpolator:
 
         if not self.precache:
             # generate the interpolator 
-            base_wavl, warwick_model, warwick_model_low_logg, table = models.build_warwick_da(flux_unit = 'flam')
+            base_wavl, warwick_model, warwick_model_low_logg, table = utils.build_warwick_da(flux_unit = 'flam')
             self.interp = lambda teff, logg: np.array([band.get_flux(base_wavl * pyphot.unit['angstrom'], 4*np.pi*warwick_model((teff, logg)) * pyphot.unit['erg/s/cm**2/angstrom'], axis = 1).to('erg/s/cm**2/angstrom').value for band in self.bands])
             
             self.key = {}
@@ -39,6 +39,9 @@ class WarwickDAInterpolator:
 
         self.teff_lims = (3001, 90000)
         self.logg_lims = (4.51, 9.49)
+
+    def __call__(self, teff, logg):
+        return self.interp(teff, logg)
 
 
 class LaPlataInterpolator:
@@ -81,6 +84,9 @@ class LaPlataInterpolator:
             # stack the tables
             table = vstack([table, temp_table])
         return table
+    
+    def __call__(self, teff, logg):
+        return self.interp(teff, logg)
     
 class SingleBandInterpolator:
     def __init__(self, table, band):
@@ -160,7 +166,7 @@ class LaPlataTests:
 
                 for i in range(len(self.teffs)):
                     for j in range(len(self.loggs)):
-                        self.grid[i,j] = interp.interp(self.teffs[i], self.loggs[j])
+                        self.grid[i,j] = interp(self.teffs[i], self.loggs[j])
 
                 grids[z] = (interp.interp, self.grid)
                 self.reset_grid()
@@ -186,7 +192,7 @@ class LaPlataTests:
 
                     for i in range(len(self.teffs)):
                         for j in range(len(self.loggs)):
-                            self.grid[i,j] = interp.interp(self.teffs[i], self.loggs[j])
+                            self.grid[i,j] = interp(self.teffs[i], self.loggs[j])
 
                     grids[layer] = (interp.interp, self.grid)
                     self.reset_grid()
@@ -212,7 +218,7 @@ class LaPlataTests:
 
                 for i in range(len(self.teffs)):
                     for j in range(len(self.loggs)):
-                        self.grid[i,j] = interp.interp(self.teffs[i], self.loggs[j])
+                        self.grid[i,j] = interp(self.teffs[i], self.loggs[j])
 
                 grids[core] = (interp.interp, self.grid)
                 self.reset_grid()
