@@ -75,4 +75,4 @@ class PhotometryEngine:
         teff = result.params['teff'].value
         e_teff = result.params['teff'].stderr
 
-        return radius, e_radius, teff, e_teff, result.redchi
+        return radius, e_radius, teff, e_teff
