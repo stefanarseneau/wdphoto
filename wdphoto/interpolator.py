@@ -19,6 +19,10 @@ class Interpolator:
         self.logg_lims = logg_lims
 
 class WarwickDAInterpolator:
+    """
+    Input:
+        bands
+    """
     def __init__(self, bands, precache=True):
         self.bands = bands # pyphot library objects
         self.precache = precache # use precaching?
