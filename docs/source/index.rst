@@ -20,4 +20,4 @@ Contents
    
    self
 
-   itest2
+   test2
