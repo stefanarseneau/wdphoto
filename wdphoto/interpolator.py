@@ -26,26 +26,24 @@ class WarwickDAInterpolator:
         if not self.precache:
             # generate the interpolator 
             base_wavl, warwick_model, warwick_model_low_logg, table = utils.build_warwick_da(flux_unit = 'flam')
-            self.interp = lambda teff, logg: np.array([band.get_flux(base_wavl * pyphot.unit['angstrom'], 4*np.pi*warwick_model((teff, logg)) * pyphot.unit['erg/s/cm**2/angstrom'], axis = 1).to('erg/s/cm**2/angstrom').value for band in self.bands])
+            self.interp = lambda teff, logg: np.array([lib[band].get_flux(base_wavl * pyphot.unit['angstrom'], warwick_model((teff, logg)) * pyphot.unit['erg/s/cm**2/angstrom'], axis = 1).to('erg/s/cm**2/angstrom').value for band in self.bands])
             
-            self.key = {}
-            for i, band in enumerate(self.bands):
-                self.key[band.name] = i
+            self.teff_lims = (3001, 90000)
+            self.logg_lims = (4.51, 9.49)
         else:
             dirpath = os.path.dirname(os.path.realpath(__file__)) # identify the current directory
             table = Table.read(f'{dirpath}/data/warwick_da/warwick_cache_table.csv') 
             self.interp = MultiBandInterpolator(table, self.bands)
-            self.key = {band:i for i, band in enumerate(self.bands)}
 
-        self.teff_lims = (3001, 90000)
-        self.logg_lims = (4.51, 9.49)
+            self.teff_lims = (3001, 99400)
+            self.logg_lims = (7.1, 8.9)
 
     def __call__(self, teff, logg):
         return self.interp(teff, logg)
 
 
 class LaPlataInterpolator:
-    def __init__(self, core, layer, z, bands):
+    def __init__(self, core, layer, z, bands, teff_lims = (5000, 73000), logg_lims = (8.85, 9.35)):
         self.masses = ['110', '116', '123', '129'] # solar masses (e.g. 1.10 Msun)
         
         self.core = core
@@ -56,9 +54,8 @@ class LaPlataInterpolator:
         self.table = self.build_table_over_mass()
 
         self.interp = MultiBandInterpolator(self.table, self.bands)
-        self.key = {band:i for i, band in enumerate(self.bands)}
-        self.teff_lims = (4000, 73000)
-        self.logg_lims = (8.85, 9.35)
+        self.teff_lims = teff_lims
+        self.logg_lims = logg_lims
 
     def build_table_over_mass(self):
         table = Table()

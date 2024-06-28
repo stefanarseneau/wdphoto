@@ -36,13 +36,13 @@ class PhotometryEngine:
             e_flux = [np.abs((np.log(10)*(-0.4)*10**(-0.4 * (mag[i] + filter.Vega_zero_mag)) * e_mag[i])) for i, filter in enumerate(self.filters)]
             return flux, e_flux
         else:
-            flux = [10**(-0.4*(mag[i] + filter.Vega_zero_mag)) for i, fiter in enumerate(self.filters)]
+            flux = [10**(-0.4*(mag[i] + filter.Vega_zero_mag)) for i, filter in enumerate(self.filters)]
             return flux
 
     def get_model_flux(self, params):
         #get model photometric flux for a WD with a given radius, located a given distance away
         teff, logg, radius, distance = params['teff'], params['logg'], params['radius'], params['distance']
-            
+        
         fl= 4 * np.pi * self.interpolator(teff, logg) # flux in physical units
 
         #convert to SI units

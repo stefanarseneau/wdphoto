@@ -2,6 +2,7 @@ from __future__ import print_function
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 import numpy as np
+import matplotlib.pyplot as plt
 
 import re
 import pickle
@@ -13,6 +14,27 @@ from astropy.table import Table
 
 import pyphot
 import extinction
+
+def plot(obs_mag, e_obs_mag, distance, radius, teff, logg, Engine):
+    model_flux = 4 * np.pi * Engine.interpolator(teff, logg)
+    #convert to SI units
+    radius = radius * 6.957e8 # Rsun to meter
+    distance = distance * 3.086775e16 # Parsec to meter
+    model_flux = (radius / distance)**2 * model_flux
+
+    lib = pyphot.get_library()
+    model_wavl = [lib[band].lpivot.to('angstrom').value for band in Engine.bands]
+
+    obs_flux, e_obs_flux = Engine.mag_to_flux(obs_mag,  e_obs_mag)
+
+    plt.figure(figsize = (8,7))
+    plt.scatter(model_wavl, model_flux, c = 'blue', label='Model Photometry')
+    plt.errorbar(model_wavl, obs_flux, yerr=e_obs_flux, linestyle = 'none', marker = 'None', capsize = 5, color = 'k')
+    plt.xlim(2500,15000)
+    plt.xlabel(r'Wavelength $[\AA]$')
+    plt.ylabel(r'Flux $[erg/s/cm^2/\AA]$')
+    plt.show()
+
 
 def deredden(bsq, l, b, photo, distance, bands):
     # create the coordinates to query against
