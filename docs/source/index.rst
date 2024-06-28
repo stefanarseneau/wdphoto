@@ -13,7 +13,11 @@ how to :ref:`installation` the project.
 Contents
 --------
 
-.. toctree::
 
-   usage
-   api
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+   
+   self
+
+   itest2
