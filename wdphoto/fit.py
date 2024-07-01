@@ -16,13 +16,12 @@ pc_to_m = 3.086775e16
 class PhotometryEngine:
     def __init__(self, interpolator, assume_mrr = False, vary_logg = False):
         self.interpolator = interpolator
-        self.bands = self.interpolator.bands
+        self.bands = interpolator.bands
+        self.teff_lims = interpolator.teff_lims
+        self.logg_lims = interpolator.logg_lims
 
         self.assume_mrr = assume_mrr
         self.vary_logg = vary_logg
-
-        self.teff_lims = interpolator.teff_lims
-        self.logg_lims = interpolator.logg_lims
 
         lib = pyphot.get_library()
         self.filters = [lib[band] for band in self.bands]
@@ -63,9 +62,6 @@ class PhotometryEngine:
         model_flux = self.get_model_flux(params)
         chisquare = ((model_flux - obs_flux) / e_obs_flux)**2
 
-        if np.any(np.isnan(chisquare)):
-            print(params)
-
         return chisquare
 
     def __call__(self, obs_mag, e_obs_mag, distance, p0 = [], method = 'leastsq'):    
@@ -75,18 +71,17 @@ class PhotometryEngine:
         if len(p0) == 0:
             p0 = [np.average(self.teff_lims), np.average(self.logg_lims), 0.001]
         
-        # initialize the parameters
+        # initialize the parameter object
+        params = lmfit.Parameters()
+        params.add('teff', value = p0[0], min = self.teff_lims[0], max = self.teff_lims[1], vary = True)
+        params.add('distance', value = distance, vary = False)
+
         if self.assume_mrr:
-            params = lmfit.Parameters()
-            params.add('teff', value = p0[0], min = self.teff_lims[0], max = self.teff_lims[1], vary = True)
-            params.add('logg', value = p0[1], min = self.logg_lims[0], max = self.logg_lims[1], vary = self.vary_logg)
-            params.add('distance', value = distance, vary = False)
+            # if we're assuming an MRR, we only need to vary logg
+            params.add('logg', value = p0[1], min = self.logg_lims[0], max = self.logg_lims[1], vary = True)
         else:
             # if not assume_mrr, initialize a specific radius variable
-            params = lmfit.Parameters()
-            params.add('teff', value = p0[0], min = self.teff_lims[0], max = self.teff_lims[1], vary = True)
             params.add('logg', value = p0[1], min = self.logg_lims[0], max = self.logg_lims[1], vary = self.vary_logg)
-            params.add('distance', value = distance, vary = False)
             params.add('radius', value = p0[2], min = 0.000001, max = 0.1, vary = True)
 
         # run the fit with the defined parameters
@@ -105,7 +100,4 @@ class PhotometryEngine:
             radius = result.params['radius'].value
             e_radius = result.params['radius'].stderr            
 
-        if self.vary_logg:
-            return radius, e_radius, teff, e_teff, logg, e_logg, result.redchi
-        else:
-            return radius, e_radius, teff, e_teff, result.redchi
+        return radius, e_radius, teff, e_teff, logg, e_logg, result.redchi
