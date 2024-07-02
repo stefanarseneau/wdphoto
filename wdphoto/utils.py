@@ -29,11 +29,11 @@ def plot(obs_mag, e_obs_mag, distance, radius, teff, logg, Engine):
 
     f = plt.figure(figsize = (8,7))
     plt.scatter(model_wavl, model_flux, c = 'blue', label='Model Photometry')
-    plt.errorbar(model_wavl, obs_flux, yerr=e_obs_flux, linestyle = 'none', marker = 'None', capsize = 5, color = 'k')
+    plt.errorbar(model_wavl, obs_flux, yerr=e_obs_flux, linestyle = 'none', marker = 'None', capsize = 5, color = 'k', label=f'Teff={teff:6.0f}\nlogg={logg:1.1f}')
     plt.xlim(2500,15000)
     plt.xlabel(r'Wavelength $[\AA]$')
     plt.ylabel(r'Flux $[erg/s/cm^2/\AA]$')
-    
+
     return f
 
 
