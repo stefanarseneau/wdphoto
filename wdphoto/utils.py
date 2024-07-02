@@ -27,13 +27,14 @@ def plot(obs_mag, e_obs_mag, distance, radius, teff, logg, Engine):
 
     obs_flux, e_obs_flux = Engine.mag_to_flux(obs_mag,  e_obs_mag)
 
-    plt.figure(figsize = (8,7))
+    f = plt.figure(figsize = (8,7))
     plt.scatter(model_wavl, model_flux, c = 'blue', label='Model Photometry')
     plt.errorbar(model_wavl, obs_flux, yerr=e_obs_flux, linestyle = 'none', marker = 'None', capsize = 5, color = 'k')
     plt.xlim(2500,15000)
     plt.xlabel(r'Wavelength $[\AA]$')
     plt.ylabel(r'Flux $[erg/s/cm^2/\AA]$')
-    plt.show()
+    
+    return f
 
 
 def deredden(bsq, l, b, photo, distance, bands):
