@@ -64,7 +64,7 @@ class PhotometryEngine:
 
         return chisquare
 
-    def __call__(self, obs_mag, e_obs_mag, distance, p0 = [], method = 'leastsq', **fit_kws):    
+    def __call__(self, obs_mag, e_obs_mag, distance, p0 = [], method = 'leastsq', fit_kws = None):    
         obs_flux, e_obs_flux = self.mag_to_flux(obs_mag,  e_obs_mag) # convert magnitudes to fluxes
 
         # if an initial guess is not specified, set it to the mean of the parameter range
