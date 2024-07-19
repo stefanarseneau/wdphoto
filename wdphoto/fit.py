@@ -64,7 +64,7 @@ class PhotometryEngine:
 
         return chisquare
 
-    def __call__(self, obs_mag, e_obs_mag, distance, p0 = [], method = 'leastsq', **kwargs):    
+    def __call__(self, obs_mag, e_obs_mag, distance, p0 = [], method = 'leastsq', **fit_kws):    
         obs_flux, e_obs_flux = self.mag_to_flux(obs_mag,  e_obs_mag) # convert magnitudes to fluxes
 
         # if an initial guess is not specified, set it to the mean of the parameter range
@@ -85,7 +85,7 @@ class PhotometryEngine:
             params.add('radius', value = p0[2], min = 0.000001, max = 0.1, vary = True)
 
         # run the fit with the defined parameters
-        result = lmfit.minimize(self.residual, params, kws = dict(obs_flux = obs_flux, e_obs_flux = e_obs_flux), method = method, **kwargs)
+        result = lmfit.minimize(self.residual, params, kws = dict(obs_flux = obs_flux, e_obs_flux = e_obs_flux), method = method, **fit_kws)
 
         # save the variables that are the same for all versions
         teff = result.params['teff'].value
