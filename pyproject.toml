@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wdphoto"
-version = "0.2.6"
+version = "0.2.7"
 authors = [
   { name="Stefan Arseneau", email="arseneausm@gmail.com" },
 ]
