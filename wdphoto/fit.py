@@ -86,7 +86,7 @@ class PhotometryEngine:
 
         # run the fit with the defined parameters
         fitter = lmfit.Minimizer(self.residual, params, fcn_args = dict(obs_flux = obs_flux, e_obs_flux = e_obs_flux))
-        result = fitter.minimize(method = method, fit_kws = fit_kws})
+        result = fitter.minimize(method = method, fit_kws = fit_kws)
 
         # save the variables that are the same for all versions
         teff = result.params['teff'].value
