@@ -85,7 +85,8 @@ class PhotometryEngine:
             params.add('radius', value = p0[2], min = 0.000001, max = 0.1, vary = True)
 
         # run the fit with the defined parameters
-        result = lmfit.minimize(self.residual, params, kws = dict(obs_flux = obs_flux, e_obs_flux = e_obs_flux), method = method, **{'fit_kws':fit_kws})
+        fitter = lmfit.Minimizer(self.residual, params, fcn_args = dict(obs_flux = obs_flux, e_obs_flux = e_obs_flux))
+        result = fitter.minimize(method = method, fit_kws = fit_kws})
 
         # save the variables that are the same for all versions
         teff = result.params['teff'].value
