@@ -100,4 +100,4 @@ class PhotometryEngine:
             radius = result.params['radius'].value
             e_radius = result.params['radius'].stderr            
 
-        return radius, e_radius, teff, e_teff, logg, e_logg, result.redchi
+        return radius, e_radius, teff, e_teff, logg, e_logg, result
