@@ -98,17 +98,18 @@ class LaPlataUltramassive:
             else:
                 Cool = Table.read(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat', format='ascii') 
                 Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
-                print(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat')
-                print(Cool.keys())
                 mass_array  = np.concatenate(( mass_array, np.ones(len(Cool)) * int(mass)/100 ))
                 logg        = np.concatenate(( logg, Cool['Log(grav)'] ))
                 age_cool    = np.concatenate(( age_cool, (10**Cool['Log(edad/Myr)'] -
                                                       10**Cool['Log(edad/Myr)'][0]) * 1e6 ))
-                teff     = np.concatenate(( teff, 10**Cool['LOG(TEFF)'] ))
+                teff     = np.concatenate(( teff, 10**Cool['LOG(TEFF)']))
                 Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['LOG(L)'] ))
                 del Cool
 
-        select = ~np.isnan(mass_array + logg + age_cool + teff + Mbol)
+        if self.core == "ONe":
+            age_cool *= 1e-3
+
+        select = ~np.isnan(mass_array + logg + age_cool + teff + Mbol) * (age_cool > 1)
         return mass_array[select], logg[select], age_cool[select], teff[select], Mbol[select]
 
     def interp_xy_z(self, x, y, z, interp_type='linear'):
