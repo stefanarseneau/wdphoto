@@ -53,10 +53,9 @@ class WarwickDAInterpolator:
     def __call__(self, teff, logg):
         return self.interp(teff, logg)
 
-class LaPlataInterpolator:
+class LaPlataUltramassive:
     def __init__(self, bands, massive_params = (None, None)):        
         self.bands = bands
-
         self.core, self.layer = massive_params[0], massive_params[1]
 
         dirpath = os.path.dirname(os.path.realpath(__file__)) # identify the current directory
@@ -66,9 +65,61 @@ class LaPlataInterpolator:
     
         self.teff_lims = limits[model][0] if (self.core is not None) else (5000, 79000)
         self.logg_lims = limits[model][1] if (self.core is not None) else (7, 9.5)
-        
         self.interp = MultiBandInterpolator(self.table, self.bands, self.teff_lims, self.logg_lims)
-        self.radius_interp = SingleBandInterpolator(self.table, 'Radius', self.teff_lims, self.logg_lims)
+
+        self.mass_array, self.logg_array, self.age_cool_array, self.teff_array, self.Mbol_array = self.read_cooling_tracks()
+
+    def read_cooling_tracks(self):
+        dirpath = os.path.dirname(os.path.realpath(__file__))
+
+        # initialize the array
+        mass_array  = np.zeros(0)
+        logg        = np.zeros(0)
+        age_cool    = np.zeros(0)
+        teff        = np.zeros(0)
+        Mbol        = np.zeros(0)
+
+        if self.core == 'ONe':
+            masses = ['110','116','122','129']
+        else:
+            masses = ['110','116','123','129']
+
+        # load in values from each track
+        for mass in masses:
+            if self.core == 'CO':
+                Cool = Table.read(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat', format='ascii') 
+                Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
+                mass_array  = np.concatenate(( mass_array, np.ones(len(Cool)) * int(mass)/100 ))
+                logg        = np.concatenate(( logg, Cool['logg(CGS)'] ))
+                age_cool    = np.concatenate(( age_cool, Cool['tcool(gyr)']))
+                teff        = np.concatenate(( teff, Cool['Teff'] ))
+                Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['log(L/Lsun)'] ))
+                del Cool
+            else:
+                Cool = Table.read(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat', format='ascii') 
+                Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
+                print(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat')
+                print(Cool.keys())
+                mass_array  = np.concatenate(( mass_array, np.ones(len(Cool)) * int(mass)/100 ))
+                logg        = np.concatenate(( logg, Cool['Log(grav)'] ))
+                age_cool    = np.concatenate(( age_cool, (10**Cool['Log(edad/Myr)'] -
+                                                      10**Cool['Log(edad/Myr)'][0]) * 1e6 ))
+                teff     = np.concatenate(( teff, 10**Cool['LOG(TEFF)'] ))
+                Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['LOG(L)'] ))
+                del Cool
+
+        select = ~np.isnan(mass_array + logg + age_cool + teff + Mbol)
+        return mass_array[select], logg[select], age_cool[select], teff[select], Mbol[select]
+
+    def interp_xy_z(self, x, y, z, interp_type='linear'):
+        selected    = ~np.isnan(x + y + z)
+
+        if interp_type == 'linear':
+            interpolator = LinearNDInterpolator
+        elif interp_type == 'cubic':
+            interpolator = CloughTocher2DInterpolator
+
+        return interpolator((x[selected], y[selected]), z[selected], rescale=True)
 
     def __call__(self, teff, logg):
         return self.interp(teff, logg)    
