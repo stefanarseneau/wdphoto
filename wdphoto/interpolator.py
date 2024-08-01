@@ -107,6 +107,19 @@ class LaPlataBase:
         radius = rsun_teff_to_m(massarray, teffarray)
         return radius
     
+    def radiustomass(self, radiusarray, teffarray):
+        radius_sun = 6.957e8
+        mass_sun = 1.9884e30
+        newton_G = 6.674e-11
+
+        g_acc = (10**self.logg_array) / 100
+        rsun = np.sqrt(self.mass_array * mass_sun * newton_G / g_acc) / radius_sun
+        
+        selected    = ~np.isnan(self.mass_array + self.teff_array + rsun)
+        rsun_teff_to_m = LinearNDInterpolator((rsun[selected], self.teff_array[selected]), self.mass_array[selected])
+        mass = rsun_teff_to_m(radiusarray, teffarray)
+        return mass
+    
     def __call__(self, teff, logg):
         return self.interp(teff, logg)  
 
@@ -180,7 +193,21 @@ class LaPlataUltramassive:
         select = ~np.isnan(mass_array + logg + age_cool + teff + Mbol) * (age_cool > 1)
         return mass_array[select], logg[select], age_cool[select], teff[select], Mbol[select]
 
-    def massradius(self, massarray, teffarray):
+    def masstoradius(self, massarray, teffarray):
+        radius_sun = 6.957e8
+        mass_sun = 1.9884e30
+        newton_G = 6.674e-11
+
+        g_acc = (10**self.logg_array) / 100
+        rsun = np.sqrt(self.mass_array * mass_sun * newton_G / g_acc) / radius_sun
+        print(rsun)
+        
+        selected    = ~np.isnan(self.mass_array + self.teff_array + rsun)
+        msun_teff_to_r = LinearNDInterpolator((self.mass_array[selected], self.teff_array[selected]), rsun[selected])
+        radius = msun_teff_to_r(massarray, teffarray)
+        return radius
+    
+    def radiustomass(self, radiusarray, teffarray):
         radius_sun = 6.957e8
         mass_sun = 1.9884e30
         newton_G = 6.674e-11
@@ -189,9 +216,9 @@ class LaPlataUltramassive:
         rsun = np.sqrt(self.mass_array * mass_sun * newton_G / g_acc) / radius_sun
         
         selected    = ~np.isnan(self.mass_array + self.teff_array + rsun)
-        rsun_teff_to_m = LinearNDInterpolator((self.mass_array[selected], self.teff_array[selected]), rsun[selected])
-        radius = rsun_teff_to_m(massarray, teffarray)
-        return radius
+        rsun_teff_to_m = LinearNDInterpolator((rsun[selected], self.teff_array[selected]), self.mass_array[selected])
+        mass = rsun_teff_to_m(radiusarray, teffarray)
+        return mass
 
     def __call__(self, teff, logg):
         return self.interp(teff, logg)    
