@@ -83,15 +83,15 @@ class LaPlataBase:
 
         # load in values from each track
         Cool = self.table
-        Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
+        #Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
         mass_array  = np.concatenate(( mass_array, Cool['mWD'] ))
         logg        = np.concatenate(( logg, Cool['logg'] ))
         age_cool    = np.concatenate(( age_cool, (10**Cool['TpreWD(gyr)'])))
-        teff     = np.concatenate(( teff, 10**Cool['teff']))
+        teff     = np.concatenate(( teff, Cool['teff']))
         Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['log(L)'] ))
         del Cool
 
-        select = ~np.isnan(mass_array + logg + age_cool + teff + Mbol) * (age_cool > 1)
+        select = ~np.isnan(mass_array + logg + age_cool + teff + Mbol)# * (age_cool > 1)
         return mass_array[select], logg[select], age_cool[select], teff[select], Mbol[select]
 
 
