@@ -52,15 +52,57 @@ class WarwickDAInterpolator:
 
     def __call__(self, teff, logg):
         return self.interp(teff, logg)
+    
+class LaPlataBase:
+    def __init__(self, bands, layer =  None):        
+        self.bands = bands
+        self.layer = layer
+
+        dirpath = os.path.dirname(os.path.realpath(__file__)) # identify the current directory
+        if self.layer == 'Hrich':
+            path = f'{dirpath}/data/laplata/allwd_Hrich.csv'
+        elif self.layer == "Hdef":
+            path = f'{dirpath}/data/laplata/allwd_Hdef.csv'
+
+        self.table = Table.read(path)
+        self.teff_lims = (5000, 79000)
+        self.logg_lims = (7, 9.5)
+        self.interp = MultiBandInterpolator(self.table, self.bands, self.teff_lims, self.logg_lims)
+
+        self.mass_array, self.logg_array, self.age_cool_array, self.teff_array, self.Mbol_array = self.read_cooling_tracks()
+
+    def read_cooling_tracks(self):
+        dirpath = os.path.dirname(os.path.realpath(__file__))
+
+        # initialize the array
+        mass_array  = np.zeros(0)
+        logg        = np.zeros(0)
+        age_cool    = np.zeros(0)
+        teff        = np.zeros(0)
+        Mbol        = np.zeros(0)
+
+        # load in values from each track
+        Cool = self.table
+        Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
+        mass_array  = np.concatenate(( mass_array, Cool['mWD'] ))
+        logg        = np.concatenate(( logg, Cool['logg'] ))
+        age_cool    = np.concatenate(( age_cool, (10**Cool['TpreWD(gyr)'])))
+        teff     = np.concatenate(( teff, 10**Cool['teff']))
+        Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['log(L)'] ))
+        del Cool
+
+        select = ~np.isnan(mass_array + logg + age_cool + teff + Mbol) * (age_cool > 1)
+        return mass_array[select], logg[select], age_cool[select], teff[select], Mbol[select]
+
 
 class LaPlataUltramassive:
-    def __init__(self, bands, massive_params = (None, None)):        
+    def __init__(self, bands, core = None, layer =  None):        
         self.bands = bands
-        self.core, self.layer = massive_params[0], massive_params[1]
+        self.core, self.layer = core, layer
 
         dirpath = os.path.dirname(os.path.realpath(__file__)) # identify the current directory
         model = f'{self.core}_{self.layer}'
-        path = f'{dirpath}/data/laplata/{model}_Massive.csv' if (self.core is not None) else f'{dirpath}/data/laplata/allwd.csv'
+        path = f'{dirpath}/data/laplata/{model}_Massive.csv' if (self.core is not None) else f'{dirpath}/data/laplata/allwd_Hrich.csv'
         self.table = Table.read(path)
     
         self.teff_lims = limits[model][0] if (self.core is not None) else (5000, 79000)
@@ -81,30 +123,40 @@ class LaPlataUltramassive:
 
         if self.core == 'ONe':
             masses = ['110','116','122','129']
-        else:
+        elif self.core == 'CO':
             masses = ['110','116','123','129']
 
         # load in values from each track
-        for mass in masses:
-            if self.core == 'CO':
-                Cool = Table.read(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat', format='ascii') 
-                Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
-                mass_array  = np.concatenate(( mass_array, np.ones(len(Cool)) * int(mass)/100 ))
-                logg        = np.concatenate(( logg, Cool['logg(CGS)'] ))
-                age_cool    = np.concatenate(( age_cool, Cool['tcool(gyr)']))
-                teff        = np.concatenate(( teff, Cool['Teff'] ))
-                Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['log(L/Lsun)'] ))
-                del Cool
-            else:
-                Cool = Table.read(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat', format='ascii') 
-                Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
-                mass_array  = np.concatenate(( mass_array, np.ones(len(Cool)) * int(mass)/100 ))
-                logg        = np.concatenate(( logg, Cool['Log(grav)'] ))
-                age_cool    = np.concatenate(( age_cool, (10**Cool['Log(edad/Myr)'] -
-                                                      10**Cool['Log(edad/Myr)'][0]) * 1e6 ))
-                teff     = np.concatenate(( teff, 10**Cool['LOG(TEFF)']))
-                Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['LOG(L)'] ))
-                del Cool
+        if self.core is not None:
+            for mass in masses:
+                if self.core == 'CO':
+                    Cool = Table.read(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat', format='ascii') 
+                    Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
+                    mass_array  = np.concatenate(( mass_array, np.ones(len(Cool)) * int(mass)/100 ))
+                    logg        = np.concatenate(( logg, Cool['logg(CGS)'] ))
+                    age_cool    = np.concatenate(( age_cool, Cool['tcool(gyr)']))
+                    teff        = np.concatenate(( teff, Cool['Teff'] ))
+                    Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['log(L/Lsun)'] ))
+                    del Cool
+                elif self.core == 'ONe':
+                    Cool = Table.read(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat', format='ascii') 
+                    Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
+                    mass_array  = np.concatenate(( mass_array, np.ones(len(Cool)) * int(mass)/100 ))
+                    logg        = np.concatenate(( logg, Cool['Log(grav)'] ))
+                    age_cool    = np.concatenate(( age_cool, (10**Cool['Log(edad/Myr)'] -
+                                                        10**Cool['Log(edad/Myr)'][0]) * 1e6 ))
+                    teff     = np.concatenate(( teff, 10**Cool['LOG(TEFF)']))
+                    Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['LOG(L)'] ))
+                    del Cool
+        else:
+            Cool = Table.read(dirpath+'/data/allwd_Hrich.csv', format='ascii') 
+            Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
+            mass_array  = np.concatenate(( mass_array, Cool['mWD'] ))
+            logg        = np.concatenate(( logg, Cool['logg'] ))
+            age_cool    = np.concatenate(( age_cool, (10**Cool['TpreWD(gyr)'])))
+            teff     = np.concatenate(( teff, 10**Cool['teff']))
+            Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['log(L)'] ))
+            del Cool
 
         if self.core == "ONe":
             age_cool *= 1e-3
@@ -112,15 +164,10 @@ class LaPlataUltramassive:
         select = ~np.isnan(mass_array + logg + age_cool + teff + Mbol) * (age_cool > 1)
         return mass_array[select], logg[select], age_cool[select], teff[select], Mbol[select]
 
-    def interp_xy_z(self, x, y, z, interp_type='linear'):
+    def interp_xy_z(self, x, y, z,):
         selected    = ~np.isnan(x + y + z)
 
-        if interp_type == 'linear':
-            interpolator = LinearNDInterpolator
-        elif interp_type == 'cubic':
-            interpolator = CloughTocher2DInterpolator
-
-        return interpolator((x[selected], y[selected]), z[selected], rescale=True)
+        return x[selected], y[selected], z[selected], LinearNDInterpolator((x[selected], y[selected]), z[selected], rescale=True)
 
     def __call__(self, teff, logg):
         return self.interp(teff, logg)    

@@ -1,3 +1,3 @@
 from .fit import PhotometryEngine
 from .utils import deredden
-from .interpolator import WarwickDAInterpolator, LaPlataUltramassive
+from .interpolator import WarwickDAInterpolator, LaPlataUltramassive, LaPlataBase
