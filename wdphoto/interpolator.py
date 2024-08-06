@@ -59,6 +59,7 @@ class LaPlataBase:
         self.layer = layer
 
         dirpath = os.path.dirname(os.path.realpath(__file__)) # identify the current directory
+        path = ''
         if self.layer == 'Hrich':
             path = f'{dirpath}/data/laplata/allwd_Hrich.csv'
         elif self.layer == "Hdef":
@@ -120,8 +121,105 @@ class LaPlataBase:
         mass = rsun_teff_to_m(radiusarray, teffarray)
         return mass
     
+    def measurabletoradius(self, teff, logg):
+        radius_sun = 6.957e8
+        mass_sun = 1.9884e30
+        newton_G = 6.674e-11
+
+        g_acc = (10**self.logg_array) / 100
+        rsun = np.sqrt(self.mass_array * mass_sun * newton_G / g_acc) / radius_sun
+        
+        selected    = ~np.isnan(self.mass_array + self.teff_array + rsun)
+        rsun_teff_to_m = LinearNDInterpolator((self.teff_array[selected], self.logg_array[selected]), rsun[selected])
+        radius = rsun_teff_to_m(teff, logg)
+        return radius    
+
     def __call__(self, teff, logg):
         return self.interp(teff, logg)  
+    
+class LaPlataLowMass:
+    def __init__(self, bands, core =  None):        
+        self.bands = bands
+        self.core = core
+
+        dirpath = os.path.dirname(os.path.realpath(__file__)) # identify the current directory
+        if self.core == 'He':
+            path = f'{dirpath}/data/laplata/He_LowMass.csv'
+            self.teff_lims = (3000, 20000)
+            self.logg_lims = (3, 7.5)
+        elif self.core == 'CO':
+            path = f'{dirpath}/data/laplata/CO_LowMass.csv'
+            self.teff_lims = (3000, 20000)
+            self.logg_lims = (3, 7.5)
+
+        self.table = Table.read(path)
+        self.interp = MultiBandInterpolator(self.table, self.bands, self.teff_lims, self.logg_lims)
+        self.mass_array, self.logg_array, self.age_cool_array, self.teff_array, self.Mbol_array = self.read_cooling_tracks()
+
+    def read_cooling_tracks(self):
+        dirpath = os.path.dirname(os.path.realpath(__file__))
+
+        # initialize the array
+        mass_array  = np.zeros(0)
+        logg        = np.zeros(0)
+        age_cool    = np.zeros(0)
+        teff        = np.zeros(0)
+        Mbol        = np.zeros(0)
+
+        # load in values from each track
+        Cool = self.table
+        #Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
+        mass_array  = np.concatenate(( mass_array, Cool['mass'] ))
+        logg        = np.concatenate(( logg, Cool['logg'] ))
+        age_cool    = np.concatenate(( age_cool, (Cool['age'])))
+        teff     = np.concatenate(( teff, Cool['teff']))
+        Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['logL'] ))
+        del Cool
+
+        select = ~np.isnan(mass_array + logg + age_cool + teff + Mbol)# * (age_cool > 1)
+        return mass_array[select], logg[select], age_cool[select], teff[select], Mbol[select]
+    
+    def massradius(self, massarray, teffarray):
+        radius_sun = 6.957e8
+        mass_sun = 1.9884e30
+        newton_G = 6.674e-11
+
+        g_acc = (10**self.logg_array) / 100
+        rsun = np.sqrt(self.mass_array * mass_sun * newton_G / g_acc) / radius_sun
+        
+        selected    = ~np.isnan(self.mass_array + self.teff_array + rsun)
+        rsun_teff_to_m = LinearNDInterpolator((self.mass_array[selected], self.teff_array[selected]), rsun[selected])
+        radius = rsun_teff_to_m(massarray, teffarray)
+        return radius
+    
+    def radiustomass(self, radiusarray, teffarray):
+        radius_sun = 6.957e8
+        mass_sun = 1.9884e30
+        newton_G = 6.674e-11
+
+        g_acc = (10**self.logg_array) / 100
+        rsun = np.sqrt(self.mass_array * mass_sun * newton_G / g_acc) / radius_sun
+        
+        selected    = ~np.isnan(self.mass_array + self.teff_array + rsun)
+        rsun_teff_to_m = LinearNDInterpolator((rsun[selected], self.teff_array[selected]), self.mass_array[selected])
+        mass = rsun_teff_to_m(radiusarray, teffarray)
+        return mass
+
+    def measurabletoradius(self, teff, logg):
+        radius_sun = 6.957e8
+        mass_sun = 1.9884e30
+        newton_G = 6.674e-11
+
+        g_acc = (10**self.logg_array) / 100
+        rsun = np.sqrt(self.mass_array * mass_sun * newton_G / g_acc) / radius_sun
+        
+        selected    = ~np.isnan(self.mass_array + self.teff_array + rsun)
+        rsun_teff_to_m = LinearNDInterpolator((self.teff_array[selected], self.logg_array[selected]), rsun[selected])
+        radius = rsun_teff_to_m(teff, logg)
+        return radius    
+    
+    def __call__(self, teff, logg):
+        return self.interp(teff, logg) 
 
 
 class LaPlataUltramassive:
@@ -156,36 +254,26 @@ class LaPlataUltramassive:
             masses = ['110','116','123','129']
 
         # load in values from each track
-        if self.core is not None:
-            for mass in masses:
-                if self.core == 'CO':
-                    Cool = Table.read(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat', format='ascii') 
-                    Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
-                    mass_array  = np.concatenate(( mass_array, np.ones(len(Cool)) * int(mass)/100 ))
-                    logg        = np.concatenate(( logg, Cool['logg(CGS)'] ))
-                    age_cool    = np.concatenate(( age_cool, Cool['tcool(gyr)']))
-                    teff        = np.concatenate(( teff, Cool['Teff'] ))
-                    Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['log(L/Lsun)'] ))
-                    del Cool
-                elif self.core == 'ONe':
-                    Cool = Table.read(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat', format='ascii') 
-                    Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
-                    mass_array  = np.concatenate(( mass_array, np.ones(len(Cool)) * int(mass)/100 ))
-                    logg        = np.concatenate(( logg, Cool['Log(grav)'] ))
-                    age_cool    = np.concatenate(( age_cool, (10**Cool['Log(edad/Myr)'] -
-                                                        10**Cool['Log(edad/Myr)'][0]) * 1e6 ))
-                    teff     = np.concatenate(( teff, 10**Cool['LOG(TEFF)']))
-                    Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['LOG(L)'] ))
-                    del Cool
-        else:
-            Cool = Table.read(dirpath+'/data/allwd_Hrich.csv', format='ascii') 
-            Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
-            mass_array  = np.concatenate(( mass_array, Cool['mWD'] ))
-            logg        = np.concatenate(( logg, Cool['logg'] ))
-            age_cool    = np.concatenate(( age_cool, (10**Cool['TpreWD(gyr)'])))
-            teff     = np.concatenate(( teff, 10**Cool['teff']))
-            Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['log(L)'] ))
-            del Cool
+        for mass in masses:
+            if self.core == 'CO':
+                Cool = Table.read(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat', format='ascii') 
+                Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
+                mass_array  = np.concatenate(( mass_array, np.ones(len(Cool)) * int(mass)/100 ))
+                logg        = np.concatenate(( logg, Cool['logg(CGS)'] ))
+                age_cool    = np.concatenate(( age_cool, Cool['tcool(gyr)']))
+                teff        = np.concatenate(( teff, Cool['Teff'] ))
+                Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['log(L/Lsun)'] ))
+                del Cool
+            elif self.core == 'ONe':
+                Cool = Table.read(dirpath+'/data/laplata/high_mass/'+self.core+'_'+mass+'_'+self.layer+'_0_02.dat', format='ascii') 
+                Cool = Cool[::10] # (Cool['LOG(TEFF)'] > logteff_min) * (Cool['LOG(TEFF)'] < logteff_max)
+                mass_array  = np.concatenate(( mass_array, np.ones(len(Cool)) * int(mass)/100 ))
+                logg        = np.concatenate(( logg, Cool['Log(grav)'] ))
+                age_cool    = np.concatenate(( age_cool, (10**Cool['Log(edad/Myr)'] -
+                                                    10**Cool['Log(edad/Myr)'][0]) * 1e6 ))
+                teff     = np.concatenate(( teff, 10**Cool['LOG(TEFF)']))
+                Mbol        = np.concatenate(( Mbol, 4.75 - 2.5 * Cool['LOG(L)'] ))
+                del Cool
 
         if self.core == "ONe":
             age_cool *= 1e-3
@@ -219,6 +307,19 @@ class LaPlataUltramassive:
         rsun_teff_to_m = LinearNDInterpolator((rsun[selected], self.teff_array[selected]), self.mass_array[selected])
         mass = rsun_teff_to_m(radiusarray, teffarray)
         return mass
+
+    def measurabletoradius(self, teff, logg):
+        radius_sun = 6.957e8
+        mass_sun = 1.9884e30
+        newton_G = 6.674e-11
+
+        g_acc = (10**self.logg_array) / 100
+        rsun = np.sqrt(self.mass_array * mass_sun * newton_G / g_acc) / radius_sun
+        
+        selected    = ~np.isnan(self.mass_array + self.teff_array + rsun)
+        rsun_teff_to_m = LinearNDInterpolator((self.teff_array[selected], self.logg_array[selected]), rsun[selected])
+        radius = rsun_teff_to_m(teff, logg)
+        return radius    
 
     def __call__(self, teff, logg):
         return self.interp(teff, logg)    
